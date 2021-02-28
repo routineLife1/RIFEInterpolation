@@ -6,6 +6,10 @@ SVFI的命令行版本
 
 要求用户有一定python基础
 
+# 已准备好的python环境
+
+（下载链接稍后放出）
+
 # requirements
 
 python 3.7.6
