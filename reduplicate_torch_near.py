@@ -117,8 +117,8 @@ while(pos != len(files)):
         break
 files = fs
 #推导exp
-exp = int(math.sqrt(need+1)) + 1 
-if 2**(exp-1) - 1 == need:
+exp = int(math.sqrt(maxc+1)) + 1 
+if 2**(exp-1) - 1 == maxc:
     exp = exp - 1
 
 padding = (0, 0, 0, 0)
