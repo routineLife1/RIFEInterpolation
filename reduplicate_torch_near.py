@@ -273,7 +273,7 @@ while pos != len(files):
     #print(n," in",len(op))
     write_buffer.put([op,num1,num2,drop])
 print("等待文件写入")
-while(not write_buffer.empty()):
+while not os.path.exists(os.path.join(args.img,'{}/{:0>9d}.png'.format(args.img,num2-1))):
     time.sleep(1)
 pbar.close()
 print("spent {}s".format(time.time() - spent))
