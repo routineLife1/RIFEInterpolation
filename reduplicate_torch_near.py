@@ -137,7 +137,8 @@ try:
     I1 = pad_image(I1)
     make_inference(I0,I1,exp)
 except:
-    print("CUDA Out Of Memory Or RAM Out Of Memory")
+    print("可能没有需要补足的重复帧")
+    print("或者显存/内存溢出")
     sys.exit(1)
 print("测试成功")
 torch.cuda.empty_cache()
