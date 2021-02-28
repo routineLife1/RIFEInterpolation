@@ -93,27 +93,29 @@ for f in os.listdir(args.img):
     files.append(os.path.join(args.img,f))
 
 fs = []
-pos = 0
+pos = 1
 maxc = 0
 need = 0
-while(pos != len(files)-1):
+im1 = files[0].replace(args.img+"\\","")
+while(pos != len(files)):
     try:
-        im1 = files[pos].replace(args.img+"\\","")
-        im2 = files[pos+1].replace(args.img+"\\","")
+        im2 = files[pos].replace(args.img+"\\","")
         n1 = int(os.path.splitext(im1)[0])
         n2 = int(os.path.splitext(im2)[0])
         need = n2 - n1 - 1
         if need != 0:
-            fs.append(files[pos])
-            fs.append(files[pos+1])
+            fs.append(os.path.join(args.img,im1))
+            fs.append(os.path.join(args.img,im2))
         if(need > maxc):
             if(need < args.static):
                 maxc = need
-                l1 = files[pos]
-                l2 = files[pos+1]
+                l1 = files[pos-1]
+                l2 = files[pos]
+        im1 = im2
         pos = pos + 1
     except:
         break
+
 files = fs
 #推导exp
 exp = int(math.sqrt(need+1)) + 1 
@@ -160,7 +162,7 @@ def clear_write_buffer(write_buffer,files):
         drop = item[3]
         kpts = [] #保留帧
         if drop:
-            need  = end - st
+            need  = end - st - 1
             vgen = output
             #丢弃多余帧(保留最邻近时刻)
 
@@ -195,7 +197,7 @@ def clear_write_buffer(write_buffer,files):
                 kpts.append(kpt)
 
         #写入文件
-        cnt = st
+        cnt = st + 1
         if drop != True:
             kpts = output
         for s in kpts:
@@ -208,24 +210,33 @@ write_buffer = Queue(maxsize=args.rbuffer)
 _thread.start_new_thread(build_read_buffer, (args, read_buffer, files))
 _thread.start_new_thread(clear_write_buffer, (write_buffer,files))
         
-pairs = len(files) - 1
+pairs = int(len(files) / 2)
+
+#print(len(files))
+#print(pairs)
+#print(files)
+#sys.exit(0)
 pbar = tqdm(total = pairs)
 pos = 0
-fd0 = read_buffer.get()
-while pos != pairs:
+while pos != len(files):
+    #print(pos,pos+1,files[pos],files[pos+1])
+
     fr0 = files[pos]
-    try:
-        fr1 = files[pos+1]
-    except:
-        break
-    fd1 = read_buffer.get()
-    I0 = torch.from_numpy(np.transpose(fd0, (2,0,1))).to(device, non_blocking=True).unsqueeze(0).float() / 255.
-    I1 = torch.from_numpy(np.transpose(fd1, (2,0,1))).to(device, non_blocking=True).unsqueeze(0).float() / 255.
-    I0 = pad_image(I0)
-    I1 = pad_image(I1)
+    fd0 = read_buffer.get()
     num1 = int(os.path.splitext(fr0.replace(args.img+"\\",""))[0])
+    I0 = torch.from_numpy(np.transpose(fd0, (2,0,1))).to(device, non_blocking=True).unsqueeze(0).float() / 255.
+    I0 = pad_image(I0)
+    pos = pos + 1
+
+    fr1 = files[pos]
+    fd1 = read_buffer.get()
     num2 = int(os.path.splitext(fr1.replace(args.img+"\\",""))[0])
-    n = num2 - num1
+    I1 = torch.from_numpy(np.transpose(fd1, (2,0,1))).to(device, non_blocking=True).unsqueeze(0).float() / 255.
+    I1 = pad_image(I1)
+    pos = pos + 1
+
+    n = num2 - num1 - 1
+    #print("num1: {} num2: {} need:{}".format(num1,num2,n))
     output = []
     drop = False
     if n >= args.static:
@@ -233,31 +244,36 @@ while pos != pairs:
             output.append(I0)
     else:
         exp = int(math.sqrt(n+1)) + 1 #推导exp
-        if 2**(exp-1) - 1 == need:
+        if 2**(exp-1) - 1 == n:
             exp = exp - 1
         diff = cv2.absdiff(fd0[:, :, ::-1], fd1[:, :, ::-1]).mean()
         if diff > args.scene:
             if args.rescene == "mix":
-                step = 1 / (2 ** exp)
+                step = 1 / (n+1)
                 alpha = 0
-                for i in range((2 ** exp) - 1):
+                for i in range(n):
                     alpha += step
                     beta = 1-alpha
                     output.append(torch.from_numpy(np.transpose(
                         (cv2.addWeighted(fd1[:, :, ::-1], alpha, fd0[:, :, ::-1], beta, 0)[:, :, ::-1].copy()),
                         (2, 0, 1))).to(device, non_blocking=True).unsqueeze(0).float() / 255.)
             else:
-                for i in range((2 ** exp) - 1):
+                for i in range(n):
                     output.append(I0)
         else:
+            #print(num1,num2)
             output = make_inference(I0,I1,exp)
             drop = True
     op = []
     for mid in output:
          mid = (((mid[0] * 255.).byte().cpu().numpy().transpose(1, 2, 0)))
          op.append(mid[:h,:w])
+    if n == len(op):
+         drop = False
+    #print(n," in",len(op))
     write_buffer.put([op,num1,num2,drop])
-    pos = pos + 1
-    fd0 = fd1
+print("等待文件写入")
+while(not write_buffer.empty()):
+    time.sleep(1)
 pbar.close()
 print("spent {}s".format(time.time() - spent))
