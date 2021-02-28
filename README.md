@@ -8,13 +8,15 @@ SVFI的命令行版本
 
 # requirements
 
-opencv-python>=4.1.2
+python 3.7.6
 
-torch>=1.0.0
+opencv-python 4.1.2
 
-numpy>=1.16
+torch 1.0.0
 
-tqdm>=4.35.0
+numpy 1.16
+
+tqdm 4.35.0
 
 psutil
 
