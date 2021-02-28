@@ -109,13 +109,12 @@ while(pos != len(files)):
         if(need > maxc):
             if(need < args.static):
                 maxc = need
-                l1 = files[pos-1]
-                l2 = files[pos]
+                l1 = os.path.join(args.img,im1)
+                l2 = os.path.join(args.img,im2)
         im1 = im2
         pos = pos + 1
     except:
         break
-
 files = fs
 #推导exp
 exp = int(math.sqrt(need+1)) + 1 
