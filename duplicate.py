@@ -13,7 +13,6 @@ dname = os.path.dirname(abspath)
 l = []
 for f in os.listdir(args.img):
     l.append(f)
-print(len(l))
 c  = bytes("{}\n{}\n{}\n{}\n".format(args.img,args.dup,len(l),args.threads),'ansi')
 
 pipe = sp.run("{}\\delgen.exe".format(dname),bufsize=-1,input=c)
