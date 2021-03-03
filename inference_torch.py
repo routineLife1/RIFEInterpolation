@@ -84,10 +84,7 @@ if args.resume:
         start = int(((maxc - 1) / (2 ** args.exp))) + 1
     start += args.start
 
-videogen = []
-for f in os.listdir(args.img):
-    if 'png' in f:
-        videogen.append(f)
+videogen = [f for f in os.listdir(args.img) if 'png' in f]
 if start != 0:
     templist = []
     pos = start - 1
@@ -105,11 +102,8 @@ h, w, _ = lastframe.shape
     
 def clear_write_buffer(user_args, write_buffer):
     cnt = 0
-    if start == 0:
-        cnt = 0
-    else:
-        cnt = (start - 1) * (2 ** args.exp) + 1
-    cnt = cnt + 1
+    cnt = 0 if start == 0 else (start - 1) * (2 ** args.exp) + 1
+    cnt += 1
     while True:
         item = write_buffer.get()
         if item is None:
