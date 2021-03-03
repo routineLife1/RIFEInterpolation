@@ -84,10 +84,7 @@ if args.resume:
         start = int(((maxc - 1) / (2 ** args.exp))) + 1
     start += args.start
 
-videogen = []
-for f in os.listdir(args.img):
-    if 'png' in f:
-        videogen.append(f)
+videogen = [f for f in os.listdir(args.img) if 'png' in f]
 if start != 0:
     templist = []
     pos = start - 1
@@ -105,11 +102,8 @@ h, w, _ = lastframe.shape
     
 def clear_write_buffer(user_args, write_buffer):
     cnt = 0
-    if start == 0:
-        cnt = 0
-    else:
-        cnt = (start - 1) * (2 ** args.exp) + 1
-    cnt = cnt + 1
+    cnt = 0 if start == 0 else (start - 1) * (2 ** args.exp) + 1
+    cnt += 1
     while True:
         item = write_buffer.get()
         if item is None:
@@ -166,14 +160,14 @@ while True:
         if args.rescene == "mix":
             step = 1 / (2 ** args.exp)
             alpha = 0
-            for i in range((2 ** args.exp) - 1):
+            for _ in range((2 ** args.exp) - 1):
                 alpha += step
                 beta = 1-alpha
                 output.append(torch.from_numpy(np.transpose(
                     (cv2.addWeighted(frame[:, :, ::-1], alpha, lastframe[:, :, ::-1], beta, 0)[:, :, ::-1].copy()),
                     (2, 0, 1))).to(device, non_blocking=True).unsqueeze(0).float() / 255.)
         else:
-            for i in range((2 ** args.exp) - 1):
+            for _ in range((2 ** args.exp) - 1):
                 output.append(I0)
     else:
         output = make_inference(I0, I1, args.exp)

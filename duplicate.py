@@ -10,9 +10,7 @@ args = parser.parse_args()
 
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
-l = []
-for f in os.listdir(args.img):
-    l.append(f)
+l = [f for f in os.listdir(args.img)]
 c  = bytes("{}\n{}\n{}\n{}\n".format(args.img,args.dup,len(l),args.threads),'ansi')
 
 pipe = sp.run("{}\\delgen.exe".format(dname),bufsize=-1,input=c)

@@ -85,19 +85,16 @@ def pad_image(img):
 
 #测试显存占用
 print("测试显存占用....")
-files = []
 l1 = ""
 l2 = ""
 
-for f in os.listdir(args.img):
-    files.append(os.path.join(args.img,f))
-
+files = [os.path.join(args.img,f) for f in os.listdir(args.img)]
 fs = []
 pos = 1
 maxc = 0
 need = 0
 im1 = files[0].replace(args.img+"\\","")
-while(pos != len(files)):
+while (pos != len(files)):
     try:
         im2 = files[pos].replace(args.img+"\\","")
         n1 = int(os.path.splitext(im1)[0])
@@ -106,18 +103,17 @@ while(pos != len(files)):
         if need != 0:
             fs.append(os.path.join(args.img,im1))
             fs.append(os.path.join(args.img,im2))
-        if(need > maxc):
-            if(need < args.static):
-                maxc = need
-                l1 = os.path.join(args.img,im1)
-                l2 = os.path.join(args.img,im2)
+        if (need > maxc) and (need < args.static):
+            maxc = need
+            l1 = os.path.join(args.img,im1)
+            l2 = os.path.join(args.img,im2)
         im1 = im2
-        pos = pos + 1
+        pos += 1
     except:
         break
 files = fs
 #推导exp
-exp = int(math.sqrt(maxc+1)) + 1 
+exp = int(math.sqrt(maxc+1)) + 1
 if 2**(exp-1) - 1 == maxc:
     exp = exp - 1
 
@@ -171,8 +167,8 @@ def clear_write_buffer(write_buffer,files):
             ntsc = []
             ntp = 0
             while ntp < 1:
-                ntp = ntp + nts
-                if (ntp + 0.000001) < 1:
+                ntp += nts
+                if ntp < 1 - 0.000001:
                     ntsc.append(ntp)
 
             #补出来的时刻
@@ -181,8 +177,8 @@ def clear_write_buffer(write_buffer,files):
             itp = 0
             n = 0
             while itp < 1:
-                itp = itp +its
-                if (itp + 0.000001) < 1:
+                itp += its
+                if itp < 1 - 0.000001:
                     itsc[itp] = vgen[n]
                     n += 1
 
@@ -209,7 +205,7 @@ read_buffer = Queue(maxsize=args.rbuffer)
 write_buffer = Queue(maxsize=args.rbuffer)
 _thread.start_new_thread(build_read_buffer, (args, read_buffer, files))
 _thread.start_new_thread(clear_write_buffer, (write_buffer,files))
-        
+
 pairs = int(len(files) / 2)
 
 #print(len(files))
@@ -226,21 +222,21 @@ while pos != len(files):
     num1 = int(os.path.splitext(fr0.replace(args.img+"\\",""))[0])
     I0 = torch.from_numpy(np.transpose(fd0, (2,0,1))).to(device, non_blocking=True).unsqueeze(0).float() / 255.
     I0 = pad_image(I0)
-    pos = pos + 1
+    pos += 1
 
     fr1 = files[pos]
     fd1 = read_buffer.get()
     num2 = int(os.path.splitext(fr1.replace(args.img+"\\",""))[0])
     I1 = torch.from_numpy(np.transpose(fd1, (2,0,1))).to(device, non_blocking=True).unsqueeze(0).float() / 255.
     I1 = pad_image(I1)
-    pos = pos + 1
+    pos += 1
 
     n = num2 - num1 - 1
     #print("num1: {} num2: {} need:{}".format(num1,num2,n))
     output = []
     drop = False
     if n >= args.static:
-        for i in range(n):
+        for _ in range(n):
             output.append(I0)
     else:
         exp = int(math.sqrt(n+1)) + 1 #推导exp
@@ -251,14 +247,14 @@ while pos != len(files):
             if args.rescene == "mix":
                 step = 1 / (n+1)
                 alpha = 0
-                for i in range(n):
+                for _ in range(n):
                     alpha += step
                     beta = 1-alpha
                     output.append(torch.from_numpy(np.transpose(
                         (cv2.addWeighted(fd1[:, :, ::-1], alpha, fd0[:, :, ::-1], beta, 0)[:, :, ::-1].copy()),
                         (2, 0, 1))).to(device, non_blocking=True).unsqueeze(0).float() / 255.)
             else:
-                for i in range(n):
+                for _ in range(n):
                     output.append(I0)
         else:
             #print(num1,num2)
