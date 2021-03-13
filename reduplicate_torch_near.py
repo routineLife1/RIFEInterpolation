@@ -16,18 +16,20 @@ import shutil
 
 warnings.filterwarnings("ignore")
 
-parser = argparse.ArgumentParser(description='Interpolation for a pair of images')
-parser.add_argument('--img', dest='img', type=str, default="")
+parser = argparse.ArgumentParser(description='补足已经删除的重复帧')
+parser.add_argument('--img', dest='img', type=str, default='input',help='图片目录')
 
-parser.add_argument('--device_id',dest='device_id',type=int,default=0)
-parser.add_argument('--model', dest='modelDir', type=str, default='train_log', help='directory with trained model files')
-parser.add_argument('--fp16', dest='fp16', action='store_true', help='fp16 mode for faster and more lightweight inference on cards with Tensor Cores')
-parser.add_argument('--scale', dest='scale', type=float, default=1.0, help='Try scale=0.5 for 4k video')
-parser.add_argument('--rbuffer', dest='rbuffer', type=int, default=200)
+parser.add_argument('--device_id',dest='device_id',type=int,default=0, help='设备ID')
+parser.add_argument('--model', dest='modelDir', type=str, default='train_log', help='模型目录')
+parser.add_argument('--fp16', dest='fp16', action='store_true', help='FP16速度更快，质量略差')
+parser.add_argument('--scale', dest='scale', type=float, default=1.0, help='4K时建议0.5')
+parser.add_argument('--rbuffer', dest='rbuffer', type=int, default=0,help='读写缓存')
+parser.add_argument('--predict_mode', dest='predict_mode', type=str, default="safe",help = "safe/performence/medium , 36HW/24HW/30HW")
+parser.add_argument('--wthreads', dest='wthreads', type=int, default=4,help='写入线程')
 
-parser.add_argument('--scene', dest='scene', type=float, default=50)
-parser.add_argument('--rescene', dest='rescene', type=str, default="mix",help="copy/mix")
-parser.add_argument('--static', dest='static', type=int, default=24,help="when duplicate frames num >= static copy left frames")
+parser.add_argument('--scene', dest='scene', type=float, default=50,help='场景识别阈值')
+parser.add_argument('--rescene', dest='rescene', type=str, default="mix",help="copy/mix   帧复制/帧混合")
+parser.add_argument('--static', dest='static', type=int, default=24,help="当重复帧多余static时，跳过补帧")
 
 args = parser.parse_args()
 assert args.scale in [0.25, 0.5, 1.0, 2.0, 4.0]
@@ -201,22 +203,35 @@ def clear_write_buffer(write_buffer,files):
             cnt = cnt + 1
         pbar.update(1)
 
-read_buffer = Queue(maxsize=args.rbuffer)
-write_buffer = Queue(maxsize=args.rbuffer)
+rb = args.read_buffer
+wb = rb
+if rb < 1:
+    ram = psutil.virtual_memory()
+    try:
+        num = 36
+        if args.predict_mode == "medium":
+            num = 30
+        elif args.predict_mode == "performence":
+            num = 24
+        wb = rb = (0.9*ram) / (num * h * w)
+    except:
+        wb = rb = 100
+if rb < 1:
+    rb = 2
+    wb = 1
+read_buffer = Queue(maxsize=rb)
+write_buffer = Queue(maxsize=wb)
+
 _thread.start_new_thread(build_read_buffer, (args, read_buffer, files))
-_thread.start_new_thread(clear_write_buffer, (write_buffer,files))
+
+for _ in range(args.wthreads):
+    _thread.start_new_thread(clear_write_buffer, (write_buffer, files))
 
 pairs = int(len(files) / 2)
 
-#print(len(files))
-#print(pairs)
-#print(files)
-#sys.exit(0)
 pbar = tqdm(total = pairs)
 pos = 0
 while pos != len(files):
-    #print(pos,pos+1,files[pos],files[pos+1])
-
     fr0 = files[pos]
     fd0 = read_buffer.get()
     num1 = int(os.path.splitext(fr0.replace(args.img+"\\",""))[0])
