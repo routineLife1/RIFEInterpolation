@@ -46,7 +46,7 @@ parser.add_argument('--redup', dest='redup',
                     action='store_true', help='去除重复帧并补足')
 parser.add_argument('--dup', dest='dup', type=int, default=1, help='dup数值')
 parser.add_argument('--static', dest='static', type=int,
-                    default=32, help='当重复帧数量大于skip时不进行补帧')
+                    default=48, help='当重复帧数量大于skip时不进行补帧')
 parser.add_argument('--scene', dest='scene', type=float,
                     default=50, help='场景识别阈值')
 parser.add_argument('--rescene', dest='rescene', type=str,
@@ -279,9 +279,7 @@ while True:
                 diff = calc_diff(lastframe,frame)
             require = (skip+1) * (2 ** args.exp - 1) + skip
             if skip < args.static:
-                exp = int(math.sqrt(require+1)) + 1  # 推导exp
-                if 2**(exp-1) - 1 == require:
-                    exp = exp - 1
+                exp = int(math.log(require,2))+1
                 if diff > args.scene:
                     output = rescene_req(frame,lastframe,require)
                 else:
