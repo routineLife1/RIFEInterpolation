@@ -167,7 +167,23 @@ def make_inference(im0, im1, exp):
     second_half = make_inference(mid, im1, exp=exp - 1)
     return [*first_half, mid, *second_half]
 
-def rescene(im0,im1,EXP):
+def rescene_req(im0,im1,REQ):
+    out = []
+    if args.rescene == "mix":
+        step = 1 / (REQ+1)
+        alpha = 0
+        for _ in range(REQ):
+            alpha += step
+            beta = 1-alpha
+            mix = cv2.addWeighted(
+                im0[:, :, ::-1], alpha, im1[:, :, ::-1], beta, 0)[:, :, ::-1].copy()
+            out.append(mix)
+    else:
+        for _ in range(REQ):
+            out.append(im0[:, :, ::-1])
+    return out
+
+def rescene_exp(im0,im1,EXP):
     out = []
     if args.rescene == "mix":
         step = 1 / (2 ** EXP)
@@ -250,8 +266,11 @@ while True:
     except:
         print('等待程序退出...')
         break
+    write_buffer.put([cnt, lastframe])
+    cnt += 1
+    pbar.update(1)
     if diff > args.scene:
-        output = rescene(frame,lastframe,args.exp)
+        output = rescene_exp(frame,lastframe,args.exp)
     else:
         if args.redup and diff < args.dup:
             while diff < args.dup:
@@ -264,21 +283,21 @@ while True:
                 if 2**(exp-1) - 1 == require:
                     exp = exp - 1
                 if diff > args.scene:
-                    output = rescene(frame,lastframe,exp)
+                    output = rescene_req(frame,lastframe,require)
                 else:
                     output = make_inference(lastframe, frame, exp)
                     kpl = drop(exp,require)
-                    tmp = [output[x] for x in kpl]
-                    output = tmp
+                    for x in kpl:
+                        write_buffer.put([cnt, output[x]])
+                        cnt += 1
+                        pbar.update(1)
+                    output = []
                     print("skip:{} require:{} exp:{} kpl:{}".format(skip,require,exp,kpl))
             else:
                 for _ in range(require):
                     output.append(frame)
         else:
             output = make_inference(lastframe, frame, args.exp)
-    write_buffer.put([cnt, lastframe])
-    cnt += 1
-    pbar.update(1)
     for mid in output:
         write_buffer.put([cnt, mid])
         cnt += 1
