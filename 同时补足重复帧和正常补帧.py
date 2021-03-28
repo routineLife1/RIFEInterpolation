@@ -26,7 +26,6 @@ parser.add_argument('--start', dest='start', type=int,
                     default=0, help='从第start张图片开始补帧')
 parser.add_argument('--resume', dest='resume',
                     action='store_true', help='自动计算count并恢复渲染')
-
 parser.add_argument('--device_id', dest='device_id',
                     type=int, default=0, help='设备ID')
 parser.add_argument('--model', dest='modelDir', type=str,
@@ -44,9 +43,7 @@ parser.add_argument('--wthreads', dest='wthreads',
 
 parser.add_argument('--redup', dest='redup',
                     action='store_true', help='去除重复帧并补足')
-parser.add_argument('--dup', dest='dup', type=int, default=1, help='dup数值')
-parser.add_argument('--static', dest='static', type=int,
-                    default=48, help='当重复帧数量大于skip时不进行补帧')
+parser.add_argument('--dup', dest='dup', type=float, default=0.5, help='dup数值')
 parser.add_argument('--scene', dest='scene', type=float,
                     default=50, help='场景识别阈值')
 parser.add_argument('--rescene', dest='rescene', type=str,
@@ -167,7 +164,7 @@ def make_inference(im0, im1, exp):
     second_half = make_inference(mid, im1, exp=exp - 1)
     return [*first_half, mid, *second_half]
 
-def rescene_req(im0,im1,REQ):
+def rescene(im0,im1,REQ):
     out = []
     if args.rescene == "mix":
         step = 1 / (REQ+1)
@@ -180,22 +177,6 @@ def rescene_req(im0,im1,REQ):
             out.append(mix)
     else:
         for _ in range(REQ):
-            out.append(im0[:, :, ::-1])
-    return out
-
-def rescene_exp(im0,im1,EXP):
-    out = []
-    if args.rescene == "mix":
-        step = 1 / (2 ** EXP)
-        alpha = 0
-        for _ in range((2 ** EXP) - 1):
-            alpha += step
-            beta = 1-alpha
-            mix = cv2.addWeighted(
-                im0[:, :, ::-1], alpha, im1[:, :, ::-1], beta, 0)[:, :, ::-1].copy()
-            out.append(mix)
-    else:
-        for _ in range((2 ** EXP) - 1):
             out.append(im0[:, :, ::-1])
     return out
 
@@ -270,30 +251,26 @@ while True:
     cnt += 1
     pbar.update(1)
     if diff > args.scene:
-        output = rescene_exp(frame,lastframe,args.exp)
+        output = rescene(frame,lastframe,(2**args.exp-1))
     else:
         if args.redup and diff < args.dup:
             while diff < args.dup:
                 skip += 1
                 frame = read_buffer.get()
                 diff = calc_diff(lastframe,frame)
-            require = (skip+1) * (2 ** args.exp - 1) + skip
-            if skip < args.static:
-                exp = int(math.log(require,2))+1
-                if diff > args.scene:
-                    output = rescene_req(frame,lastframe,require)
-                else:
-                    output = make_inference(lastframe, frame, exp)
-                    kpl = drop(exp,require)
-                    for x in kpl:
-                        write_buffer.put([cnt, output[x]])
-                        cnt += 1
-                        pbar.update(1)
-                    output = []
-                    print("skip:{} require:{} exp:{} kpl:{}".format(skip,require,exp,kpl))
+            require = (skip + 1) * (2 ** args.exp - 1) + skip
+            exp = int(math.log(require,2))+1
+            if diff > args.scene:
+                output = rescene(frame,lastframe,require)
             else:
-                for _ in range(require):
-                    output.append(frame)
+                output = make_inference(lastframe, frame, exp)
+                kpl = drop(exp,require)
+                for x in kpl:
+                    write_buffer.put([cnt, output[x]])
+                    cnt += 1
+                    pbar.update(1)
+                output = []
+                print("skip:{} require:{} exp:{} kpl:{}".format(skip,require,exp,kpl))
         else:
             output = make_inference(lastframe, frame, args.exp)
     for mid in output:
@@ -307,3 +284,4 @@ while(not os.path.exists('{}/{:0>9d}.png'.format(args.output, cnt))):
     time.sleep(1)
 pbar.close()
 print("spent {}s".format(time.time()-spent))
+
